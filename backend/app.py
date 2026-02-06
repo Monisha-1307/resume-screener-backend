@@ -7,6 +7,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import pdfplumber
 from docx import Document
+from PIL import Image
+import pytesseract
 
 app = Flask(__name__)
 CORS(app)
@@ -60,18 +62,35 @@ def upload_resume():
         filename = file.filename.lower()
 
         if filename.endswith(".pdf"):
-            file.seek(0)  # reset pointer
+            file.seek(0)
             with pdfplumber.open(file) as pdf:
                 for page in pdf.pages:
                     page_text = page.extract_text()
                     if page_text:
                         text += page_text + "\n"
 
+                    # OCR fallback if no text extracted
+                    if not page_text:
+                        pil_image = page.to_image(resolution=300).original
+                        ocr_text = pytesseract.image_to_string(pil_image)
+                        if ocr_text.strip():
+                            text += ocr_text + "\n"
+
         elif filename.endswith(".docx"):
-            file.seek(0)  # reset pointer
+            file.seek(0)
             doc = Document(file)
+
+            # Extract paragraphs
             for para in doc.paragraphs:
-                text += para.text + "\n"
+                if para.text.strip():
+                    text += para.text + "\n"
+
+            # Extract tables
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        if cell.text.strip():
+                            text += cell.text + "\n"
 
         else:
             file.seek(0)
