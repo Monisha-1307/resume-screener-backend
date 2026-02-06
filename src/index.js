@@ -4,6 +4,10 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 import 'bootstrap/dist/css/bootstrap.min.css';  // <-- Bootstrap import
+import axios from 'axios';  // <-- Import axios
+
+// Set default backend URL for all axios requests
+axios.defaults.baseURL = "https://resume-screener-backend.onrender.com";
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
