@@ -170,10 +170,10 @@ def resume_summary():
 @app.route('/check_tesseract')
 def check_tesseract():
     try:
-        version = pytesseract.get_tesseract_version()
-        return jsonify({"tesseract_version": str(version)})
+        version = subprocess.check_output(['tesseract', '--version']).decode('utf-8').split('\n')[0]
+        return {"tesseract_version": version}
     except Exception as e:
-        return jsonify({"error": str(e)})
+        return {"error": str(e)}
 
 # -------------------------------
 # Run Flask app (local only)
