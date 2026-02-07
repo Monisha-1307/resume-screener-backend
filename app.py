@@ -55,7 +55,7 @@ def calculate_similarity_with_keywords(resume_text, job_text):
 # -------------------------------
 # Upload resume (frontend expects /upload)
 # -------------------------------
-@app.route('/upload', methods=['POST'])
+@app.route('/upload_resume', methods=['POST'])
 def upload_resume():
     if 'resume' not in request.files:
         return jsonify({"error": "No resume file uploaded"}), 400
