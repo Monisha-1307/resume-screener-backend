@@ -1,4 +1,5 @@
 import os
+import subprocess
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
@@ -14,17 +15,21 @@ app = Flask(__name__)
 CORS(app)
 
 # -------------------------------
-# Environment variables (Render / local)
+# Environment variables
 # -------------------------------
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'fallbacksecret')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///default.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# -------------------------------
-# Initialize extensions
-# -------------------------------
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
+
+# -------------------------------
+# Health check
+# -------------------------------
+@app.route('/ping')
+def ping():
+    return {"status": "ok"}
 
 # -------------------------------
 # Root route
@@ -34,7 +39,7 @@ def home():
     return jsonify({"message": "Resume Screener Backend is running!"})
 
 # -------------------------------
-# Utility function: similarity + keywords
+# Utility function
 # -------------------------------
 def calculate_similarity_with_keywords(resume_text, job_text):
     vectorizer = TfidfVectorizer(stop_words='english')
@@ -48,9 +53,9 @@ def calculate_similarity_with_keywords(resume_text, job_text):
     return round(similarity * 100, 2), common_words
 
 # -------------------------------
-# API route: upload resume file (PDF + DOCX + TXT supported)
+# Upload resume (frontend expects /upload)
 # -------------------------------
-@app.route('/upload_resume', methods=['POST'])
+@app.route('/upload', methods=['POST'])
 def upload_resume():
     if 'resume' not in request.files:
         return jsonify({"error": "No resume file uploaded"}), 400
@@ -68,9 +73,7 @@ def upload_resume():
                     page_text = page.extract_text()
                     if page_text:
                         text += page_text + "\n"
-
-                    # OCR fallback if no text extracted
-                    if not page_text:
+                    else:
                         pil_image = page.to_image(resolution=300).original
                         ocr_text = pytesseract.image_to_string(pil_image)
                         if ocr_text.strip():
@@ -79,13 +82,9 @@ def upload_resume():
         elif filename.endswith(".docx"):
             file.seek(0)
             doc = Document(file)
-
-            # Extract paragraphs
             for para in doc.paragraphs:
                 if para.text.strip():
                     text += para.text + "\n"
-
-            # Extract tables
             for table in doc.tables:
                 for row in table.rows:
                     for cell in row.cells:
@@ -102,7 +101,7 @@ def upload_resume():
     return jsonify({"resume_text": text})
 
 # -------------------------------
-# API route: compare resume vs single job
+# Match routes
 # -------------------------------
 @app.route('/match', methods=['POST'])
 def match_resume():
@@ -114,9 +113,6 @@ def match_resume():
     score, keywords = calculate_similarity_with_keywords(resume, job)
     return jsonify({"score": score, "keywords": keywords})
 
-# -------------------------------
-# API route: compare resume vs multiple jobs
-# -------------------------------
 @app.route('/match_multiple', methods=['POST'])
 def match_multiple():
     data = request.json
@@ -137,7 +133,7 @@ def match_multiple():
     return jsonify({"results": results})
 
 # -------------------------------
-# API route: generate skill-focused resume summary
+# Resume summary
 # -------------------------------
 @app.route('/resume_summary', methods=['POST'])
 def resume_summary():
@@ -165,7 +161,7 @@ def resume_summary():
     return jsonify({"summary": summary})
 
 # -------------------------------
-# API route: check Tesseract installation
+# Check Tesseract
 # -------------------------------
 @app.route('/check_tesseract')
 def check_tesseract():
