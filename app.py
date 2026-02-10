@@ -1,4 +1,5 @@
 import os
+import urllib
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
@@ -8,7 +9,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 import pdfplumber
 from docx import Document
 import pytesseract
-import urllib
 
 app = Flask(__name__)
 CORS(app)
@@ -60,11 +60,10 @@ def upload_resume():
         return jsonify({"error": "No resume file uploaded"}), 400
 
     file = request.files['resume']
+    filename = file.filename.lower()
     text = ""
 
     try:
-        filename = file.filename.lower()
-
         if filename.endswith(".pdf"):
             file.seek(0)
             with pdfplumber.open(file) as pdf:
@@ -73,6 +72,7 @@ def upload_resume():
                     if page_text:
                         text += page_text + "\n"
                     else:
+                        # OCR fallback for scanned PDFs
                         pil_image = page.to_image(resolution=300).original
                         ocr_text = pytesseract.image_to_string(pil_image)
                         if ocr_text.strip():
@@ -91,13 +91,17 @@ def upload_resume():
                             text += cell.text + "\n"
 
         else:
+            # Fallback for plain text files
             file.seek(0)
             text = file.read().decode('utf-8', errors='ignore')
 
+        if not text.strip():
+            return jsonify({"error": "No text extracted from resume"}), 500
+
+        return jsonify({"resume_text": text})
+
     except Exception as e:
         return jsonify({"error": f"Failed to extract text: {str(e)}"}), 500
-
-    return jsonify({"resume_text": text})
 
 # -------------------------------
 # Match routes
