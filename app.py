@@ -12,7 +12,7 @@ from docx import Document
 import pytesseract
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # -------------------------------
 # Environment variables
@@ -68,7 +68,8 @@ def upload_resume():
     try:
         if filename.endswith(".pdf"):
             file.seek(0)
-            with pdfplumber.open(BytesIO(file.read())) as pdf:
+            pdf_bytes = BytesIO(file.read())
+            with pdfplumber.open(pdf_bytes) as pdf:
                 for page in pdf.pages:
                     page_text = page.extract_text()
                     if page_text:
@@ -82,7 +83,8 @@ def upload_resume():
 
         elif filename.endswith(".docx"):
             file.seek(0)
-            doc = Document(BytesIO(file.read()))
+            doc_bytes = BytesIO(file.read())
+            doc = Document(doc_bytes)
             for para in doc.paragraphs:
                 if para.text.strip():
                     text += para.text + "\n"
@@ -101,7 +103,7 @@ def upload_resume():
             app.logger.warning("No text extracted from resume")
             return jsonify({"error": "No text extracted from resume"}), 500
 
-        app.logger.info(f"Successfully extracted text from {filename}")
+        app.logger.info(f"Successfully extracted text from {filename}, length={len(text)}")
         return jsonify({"resume_text": text})
 
     except Exception as e:
