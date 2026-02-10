@@ -1,5 +1,6 @@
 import os
 import urllib
+from io import BytesIO
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
@@ -57,6 +58,7 @@ def calculate_similarity_with_keywords(resume_text, job_text):
 @app.route('/upload_resume', methods=['POST'])
 def upload_resume():
     if 'resume' not in request.files:
+        app.logger.error("No resume file found in request")
         return jsonify({"error": "No resume file uploaded"}), 400
 
     file = request.files['resume']
@@ -66,7 +68,7 @@ def upload_resume():
     try:
         if filename.endswith(".pdf"):
             file.seek(0)
-            with pdfplumber.open(file) as pdf:
+            with pdfplumber.open(BytesIO(file.read())) as pdf:
                 for page in pdf.pages:
                     page_text = page.extract_text()
                     if page_text:
@@ -80,7 +82,7 @@ def upload_resume():
 
         elif filename.endswith(".docx"):
             file.seek(0)
-            doc = Document(file)
+            doc = Document(BytesIO(file.read()))
             for para in doc.paragraphs:
                 if para.text.strip():
                     text += para.text + "\n"
@@ -96,11 +98,14 @@ def upload_resume():
             text = file.read().decode('utf-8', errors='ignore')
 
         if not text.strip():
+            app.logger.warning("No text extracted from resume")
             return jsonify({"error": "No text extracted from resume"}), 500
 
+        app.logger.info(f"Successfully extracted text from {filename}")
         return jsonify({"resume_text": text})
 
     except Exception as e:
+        app.logger.error(f"Extraction failed: {str(e)}")
         return jsonify({"error": f"Failed to extract text: {str(e)}"}), 500
 
 # -------------------------------
