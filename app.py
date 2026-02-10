@@ -8,6 +8,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import pdfplumber
 from docx import Document
 import pytesseract
+import urllib
 
 app = Flask(__name__)
 CORS(app)
@@ -157,6 +158,18 @@ def resume_summary():
         summary = "No specific technical skills detected in the resume."
 
     return jsonify({"summary": summary})
+
+# -------------------------------
+# Debug route: list all routes
+# -------------------------------
+@app.route('/routes')
+def list_routes():
+    output = []
+    for rule in app.url_map.iter_rules():
+        methods = ','.join(rule.methods)
+        line = urllib.parse.unquote(f"{rule.endpoint}: {rule.rule} [{methods}]")
+        output.append(line)
+    return jsonify({"routes": output})
 
 # -------------------------------
 # Run Flask app (local only)
