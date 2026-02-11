@@ -127,6 +127,8 @@ def upload_resume():
         return jsonify({"resume_text": text, "resume_id": new_resume.id})
 
     except Exception as e:
+        # ✅ Print error so it shows in Render logs
+        print("Extraction failed:", str(e))
         return jsonify({"error": f"Failed to extract text: {str(e)}"}), 500
 
 # -------------------------------
@@ -162,7 +164,6 @@ def match_resume():
 
     score, keywords = calculate_similarity_with_keywords(resume_text, job_text)
 
-    # ✅ Save comparison
     if resume_id and job_id:
         comparison = Comparison(resume_id=resume_id, job_id=job_id,
                                 score=score, keywords=",".join(keywords))
@@ -190,7 +191,6 @@ def match_multiple():
             "keywords": keywords
         })
 
-        # ✅ Save job + comparison
         new_job = Job(title=job["title"], description=job["description"])
         db.session.add(new_job)
         db.session.commit()
@@ -269,4 +269,3 @@ def list_routes():
 # -------------------------------
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()
