@@ -10,6 +10,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import pdfplumber
 from docx import Document
 import pytesseract
+import traceback
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -127,8 +128,9 @@ def upload_resume():
         return jsonify({"resume_text": text, "resume_id": new_resume.id})
 
     except Exception as e:
-        # ✅ Print error so it shows in Render logs
+        # ✅ Print full traceback so Render logs show the error
         print("Extraction failed:", str(e))
+        traceback.print_exc()
         return jsonify({"error": f"Failed to extract text: {str(e)}"}), 500
 
 # -------------------------------
@@ -269,5 +271,5 @@ def list_routes():
 # -------------------------------
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()     # ✅ ensures tables are created
+        db.create_all() # ensures tables are created
     app.run(debug=True)
