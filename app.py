@@ -9,7 +9,6 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import pdfplumber
 from docx import Document
-import pytesseract
 import traceback
 
 app = Flask(__name__)
@@ -78,7 +77,9 @@ def calculate_similarity_with_keywords(resume_text, job_text):
 # -------------------------------
 @app.route('/upload_resume', methods=['POST'])
 def upload_resume():
+    print("Received upload_resume request")
     if 'resume' not in request.files:
+        print("No resume file in request")
         return jsonify({"error": "No resume file uploaded"}), 400
 
     file = request.files['resume']
@@ -94,11 +95,6 @@ def upload_resume():
                     page_text = page.extract_text()
                     if page_text:
                         text += page_text + "\n"
-                    else:
-                        pil_image = page.to_image(resolution=300).original
-                        ocr_text = pytesseract.image_to_string(pil_image)
-                        if ocr_text.strip():
-                            text += ocr_text + "\n"
 
         elif filename.endswith(".docx"):
             file.seek(0)
@@ -118,17 +114,17 @@ def upload_resume():
             text = file.read().decode('utf-8', errors='ignore')
 
         if not text.strip():
+            print("No text extracted from resume")
             return jsonify({"error": "No text extracted from resume"}), 500
 
-        # ✅ Save resume to DB
         new_resume = Resume(filename=filename, content=text)
         db.session.add(new_resume)
         db.session.commit()
 
+        print(f"Stored resume {filename} with id={new_resume.id}, length={len(text)}")
         return jsonify({"resume_text": text, "resume_id": new_resume.id})
 
     except Exception as e:
-        # ✅ Print full traceback so Render logs show the error
         print("Extraction failed:", str(e))
         traceback.print_exc()
         return jsonify({"error": f"Failed to extract text: {str(e)}"}), 500
@@ -271,5 +267,5 @@ def list_routes():
 # -------------------------------
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all() # ensures tables are created
+        db.create_all()  # ensures tables are created
     app.run(debug=True)
