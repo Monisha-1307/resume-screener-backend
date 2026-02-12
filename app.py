@@ -124,11 +124,141 @@ def upload_resume():
         return jsonify({"error": f"Failed to extract text: {str(e)}"}), 500
 
 # -------------------------------
-# Other routes (jobs, match, summary, etc.)
+# Job routes
 # -------------------------------
-# ... keep the rest of your code unchanged ...
-# (add_job, match, match_multiple, resume_summary, get_resumes, get_jobs, get_comparisons, list_routes)
+@app.route('/add_job', methods=['POST'])
+def add_job():
+    data = request.json
+    title = data.get("title", "")
+    description = data.get("description", "")
+    if not title or not description:
+        return jsonify({"error": "Job title or description missing"}), 400
 
+    new_job = Job(title=title, description=description)
+    db.session.add(new_job)
+    db.session.commit()
+
+    return jsonify({"job_id": new_job.id, "title": title})
+
+# -------------------------------
+# Match routes
+# -------------------------------
+@app.route('/match', methods=['POST'])
+def match_resume():
+    data = request.json
+    resume_text = data.get("resume", "")
+    job_text = data.get("job", "")
+    resume_id = data.get("resume_id")
+    job_id = data.get("job_id")
+
+    if not resume_text or not job_text:
+        return jsonify({"error": "Resume or job description missing"}), 400
+
+    score, keywords = calculate_similarity_with_keywords(resume_text, job_text)
+
+    if resume_id and job_id:
+        comparison = Comparison(resume_id=resume_id, job_id=job_id,
+                                score=score, keywords=",".join(keywords))
+        db.session.add(comparison)
+        db.session.commit()
+
+    return jsonify({"score": score, "keywords": keywords})
+
+@app.route('/match_multiple', methods=['POST'])
+def match_multiple():
+    data = request.json
+    resume_text = data.get("resume", "")
+    jobs = data.get("jobs", [])
+    resume_id = data.get("resume_id")
+
+    if not resume_text or not jobs:
+        return jsonify({"error": "Resume or job descriptions missing"}), 400
+
+    results = []
+    for job in jobs:
+        score, keywords = calculate_similarity_with_keywords(resume_text, job["description"])
+        results.append({
+            "title": job["title"],
+            "score": score,
+            "keywords": keywords
+        })
+
+        new_job = Job(title=job["title"], description=job["description"])
+        db.session.add(new_job)
+        db.session.commit()
+
+        comparison = Comparison(resume_id=resume_id, job_id=new_job.id,
+                                score=score, keywords=",".join(keywords))
+        db.session.add(comparison)
+        db.session.commit()
+
+    return jsonify({"results": results})
+
+# -------------------------------
+# Resume summary
+# -------------------------------
+@app.route('/resume_summary', methods=['POST'])
+def resume_summary():
+    data = request.json
+    resume = data.get("resume", "")
+    if not resume:
+        return jsonify({"error": "Resume text missing"}), 400
+
+    skills_list = [
+        "python", "sql", "java", "c++", "tableau", "power bi", "excel",
+        "kubernetes", "docker", "aws", "azure", "gcp",
+        "prometheus", "grafana", "victoriametrics",
+        "machine learning", "data science", "analytics",
+        "digital marketing", "seo", "sem"
+    ]
+
+    resume_lower = resume.lower()
+    matched_skills = [skill for skill in skills_list if skill in resume_lower]
+
+    if matched_skills:
+        summary = f"This resume highlights skills in: {', '.join(matched_skills)}"
+    else:
+        summary = "No specific technical skills detected in the resume."
+
+    return jsonify({"summary": summary})
+
+# -------------------------------
+# List stored data
+# -------------------------------
+@app.route('/resumes', methods=['GET'])
+def get_resumes():
+    resumes = Resume.query.all()
+    return jsonify([{"id": r.id, "filename": r.filename, "content": r.content[:200]} for r in resumes])
+
+@app.route('/jobs', methods=['GET'])
+def get_jobs():
+    jobs = Job.query.all()
+    return jsonify([{"id": j.id, "title": j.title, "description": j.description[:200]} for j in jobs])
+
+@app.route('/comparisons', methods=['GET'])
+def get_comparisons():
+    comps = Comparison.query.all()
+    return jsonify([
+        {"id": c.id, "resume_id": c.resume_id, "job_id": c.job_id,
+         "score": c.score, "keywords": c.keywords}
+        for c in comps
+    ])
+
+# -------------------------------
+# Debug route
+# -------------------------------
+@app.route('/routes')
+def list_routes():
+    output = []
+    for rule in app.url_map.iter_rules():
+        methods = ','.join(rule.methods)
+        line = urllib.parse.unquote(f"{rule.endpoint}: {rule.rule} [{methods}]")
+        output.append(line)
+    return jsonify({"routes": output})
+
+# -------------------------------
+# Run Flask app
+# -------------------------------
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
