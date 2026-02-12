@@ -55,6 +55,22 @@ def home():
     return jsonify({"message": "Resume Screener Backend is running!"})
 
 # -------------------------------
+# DB health check
+# -------------------------------
+@app.route('/ping_db')
+def ping_db():
+    try:
+        resume_count = Resume.query.count()
+        job_count = Job.query.count()
+        return jsonify({
+            "status": "ok",
+            "resume_count": resume_count,
+            "job_count": job_count
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+# -------------------------------
 # Utility function
 # -------------------------------
 def calculate_similarity_with_keywords(resume_text, job_text):
