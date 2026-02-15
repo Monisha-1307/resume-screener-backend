@@ -54,9 +54,6 @@ def ping():
 def home():
     return jsonify({"message": "Resume Screener Backend is running!"})
 
-# -------------------------------
-# DB health check
-# -------------------------------
 @app.route('/ping_db')
 def ping_db():
     try:
@@ -89,9 +86,7 @@ def calculate_similarity_with_keywords(resume_text, job_text):
 # -------------------------------
 @app.route('/upload_resume', methods=['POST'])
 def upload_resume():
-    print("Received upload_resume request")
     if 'resume' not in request.files:
-        print("No resume file in request")
         return jsonify({"error": "No resume file uploaded"}), 400
 
     file = request.files['resume']
@@ -109,7 +104,7 @@ def upload_resume():
 
         elif filename.endswith(".docx"):
             file.seek(0)
-            doc = Document(file)  # ✅ direct file object
+            doc = Document(file)
             for para in doc.paragraphs:
                 if para.text.strip():
                     text += para.text + "\n"
@@ -124,18 +119,15 @@ def upload_resume():
             text = file.read().decode('utf-8', errors='ignore')
 
         if not text.strip():
-            print("No text extracted from resume")
             return jsonify({"error": "No text extracted from resume"}), 500
 
         new_resume = Resume(filename=filename, content=text)
         db.session.add(new_resume)
         db.session.commit()
 
-        print(f"Stored resume {filename} with id={new_resume.id}, length={len(text)}")
         return jsonify({"resume_text": text, "resume_id": new_resume.id})
 
     except Exception as e:
-        print("Extraction failed:", str(e))
         traceback.print_exc()
         return jsonify({"error": f"Failed to extract text: {str(e)}"}), 500
 
@@ -192,14 +184,14 @@ def match_multiple():
 
     results = []
     for job in jobs:
-        score, keywords = calculate_similarity_with_keywords(resume_text, job["description"])
-        results.append({
-            "title": job["title"],
-            "score": score,
-            "keywords": keywords
-        })
+        title = job.get("title", "")
+        description = job.get("description", "")
+        if not title or not description:
+            continue
 
-        new_job = Job(title=job["title"], description=job["description"])
+        score, keywords = calculate_similarity_with_keywords(resume_text, description)
+
+        new_job = Job(title=title, description=description)
         db.session.add(new_job)
         db.session.commit()
 
@@ -207,6 +199,13 @@ def match_multiple():
                                 score=score, keywords=",".join(keywords))
         db.session.add(comparison)
         db.session.commit()
+
+        results.append({
+            "job_id": new_job.id,
+            "title": title,
+            "score": score,
+            "keywords": keywords
+        })
 
     return jsonify({"results": results})
 
